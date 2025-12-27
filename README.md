@@ -4,8 +4,10 @@ A lightweight Python bot that monitors upcoming concerts for your favorite Spoti
 
 ## Features
 
-- ✅ Fetches your top artists and followed artists from Spotify
-- ✅ Searches for concerts within a configurable radius of your location
+- ✅ Merges your curated artist list with Spotify followed artists automatically
+- ✅ Searches for concerts within a configurable radius of your location (up to 12 months ahead)
+- ✅ Filters out tribute bands and false positive matches
+- ✅ Formatted output with artist summary and monthly grouping
 - ✅ Writes new concert alerts to a text file
 - ✅ Tracks previously notified concerts to avoid duplicates
 - ✅ Lightweight and easy to run locally or via GitHub Actions
@@ -50,11 +52,20 @@ Edit `.env` and add your credentials:
 SPOTIFY_CLIENT_ID=your_spotify_client_id_here
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
 TICKETMASTER_API_KEY=your_ticketmaster_api_key_here
-ZIP_CODE=90094
+LATITUDE=34.0522
+LONGITUDE=-118.2437
 SEARCH_RADIUS=40
 ```
 
-### 4. Run the Bot
+### 4. Create Your Artist List (Optional)
+
+```bash
+cp my_artists.txt.example my_artists.txt
+```
+
+Edit `my_artists.txt` to add your favorite artists (one per line). The bot will automatically merge this with your Spotify followed artists.
+
+### 5. Run the Bot
 
 ```bash
 python concert_bot.py
@@ -68,27 +79,39 @@ On first run, it will:
 
 New concerts will be written to `concert_alerts.txt`
 
+To generate a formatted, easy-to-read version:
+
+```bash
+python format_concerts.py
+```
+
+This creates `concert_alerts_formatted.txt` with concerts grouped by month and an artist summary at the top.
+
 ## How It Works
 
-1. **Fetches your favorite artists** from Spotify (top artists + followed artists)
-2. **Searches Ticketmaster** for concerts by each artist within 40 miles of zip code 90094
-3. **Checks against previous alerts** to avoid duplicates
-4. **Writes new concerts** to `concert_alerts.txt`
-5. **Saves state** in JSON files to track what's been notified
+1. **Loads your curated artist list** from `my_artists.txt` (if it exists)
+2. **Fetches followed artists from Spotify** and merges with your curated list (deduplicates automatically)
+3. **Searches Ticketmaster** for concerts by each artist within your specified radius
+4. **Filters out tribute bands** and verifies artist matches to avoid false positives
+5. **Checks against previous alerts** to avoid duplicates
+6. **Writes new concerts** to `concert_alerts.txt` and `concert_alerts_formatted.txt`
+7. **Saves state** in JSON files to track what's been notified
 
 ## Files Created
 
-- `artists_cache.json` - Cached list of your favorite artists
+- `my_artists.txt` - Your curated artist list (optional, created from .example file)
+- `artists_cache.json` - Cached list of merged artists (curated + Spotify follows)
 - `notified_concerts.json` - IDs of concerts you've already been notified about
-- `concert_alerts.txt` - Output file with concert alerts
+- `concert_alerts.txt` - Raw output file with all concert alerts
+- `concert_alerts_formatted.txt` - Formatted output grouped by month with artist summary
 - `.cache` - Spotify OAuth token (auto-generated)
 
 ## Configuration
 
 Edit `config.py` to change:
 - Search radius (default: 40 miles)
-- Zip code (default: 90094)
-- Search window (default: 6 months ahead)
+- Location coordinates (default: Los Angeles - 34.0522, -118.2437)
+- Search window (default: 12 months ahead)
 - File names
 
 ## Running Weekly (GitHub Actions)

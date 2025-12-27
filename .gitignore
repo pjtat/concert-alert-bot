@@ -19,6 +19,10 @@ notified_concerts.json
 artists_cache.json
 concert_alerts_formatted.txt
 
+# Personal artist lists (use .example files as templates)
+my_artists.txt
+all_artists.txt
+
 # Spotify OAuth cache
 .cache
 .cache-*

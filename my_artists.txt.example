@@ -1,0 +1,21 @@
+# My Artists List
+# 
+# Add your favorite artists here, one per line.
+# The bot will monitor these artists for upcoming concerts.
+#
+# Tips:
+# - Artist names should match how they appear on Ticketmaster
+# - Lines starting with # are comments and will be ignored
+# - Empty lines are ignored
+# - The bot will also check your Spotify followed artists and merge them automatically
+#
+# Example artists (replace with your own):
+
+Arctic Monkeys
+Beyoncé
+Coldplay
+Doja Cat
+Ed Sheeran
+Foo Fighters
+Taylor Swift
+The Weeknd
