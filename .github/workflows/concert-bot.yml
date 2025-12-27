@@ -27,3 +27,10 @@ jobs:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+      - name: Commit tracking file updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add notified_concerts.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update concert tracking [skip ci]"
+          git push
