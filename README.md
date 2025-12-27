@@ -8,6 +8,7 @@ A lightweight Python bot that monitors upcoming concerts for your favorite Spoti
 - ✅ Searches for concerts within a configurable radius of your location (up to 12 months ahead)
 - ✅ Filters out tribute bands and false positive matches
 - ✅ Formatted output with artist summary and monthly grouping
+- ✅ Email notifications via SendGrid (optional)
 - ✅ Writes new concert alerts to a text file
 - ✅ Tracks previously notified concerts to avoid duplicates
 - ✅ Lightweight and easy to run locally or via GitHub Actions
@@ -39,6 +40,16 @@ pip install -r requirements.txt
 2. Sign up for a free account
 3. Go to "My Apps" and create a new app
 4. Copy your **API Key** (also called Consumer Key)
+
+#### SendGrid Email (Optional)
+1. Go to [SendGrid](https://signup.sendgrid.com/)
+2. Sign up for a free account (100 emails/day free forever)
+3. Go to Settings → [API Keys](https://app.sendgrid.com/settings/api_keys)
+4. Click "Create API Key"
+5. Name it "Concert Alert Bot" and give it "Full Access"
+6. Copy your **API Key** (you won't be able to see it again!)
+7. Go to Settings → [Sender Authentication](https://app.sendgrid.com/settings/sender_auth)
+8. Verify a sender email address (the email you'll send from)
 
 ### 3. Configure Environment Variables
 
@@ -95,7 +106,8 @@ This creates `concert_alerts_formatted.txt` with concerts grouped by month and a
 4. **Filters out tribute bands** and verifies artist matches to avoid false positives
 5. **Checks against previous alerts** to avoid duplicates
 6. **Writes new concerts** to `concert_alerts.txt` and `concert_alerts_formatted.txt`
-7. **Saves state** in JSON files to track what's been notified
+7. **Sends email notification** (if enabled) with a nicely formatted HTML email
+8. **Saves state** in JSON files to track what's been notified
 
 ## Files Created
 
@@ -113,6 +125,26 @@ Edit `config.py` to change:
 - Location coordinates (default: Los Angeles - 34.0522, -118.2437)
 - Search window (default: 12 months ahead)
 - File names
+
+### Enable Email Notifications
+
+To receive email alerts when new concerts are found:
+
+1. Complete the SendGrid setup (see step 2 above)
+2. Edit your `.env` file:
+   ```
+   SEND_EMAIL_NOTIFICATIONS=true
+   SENDGRID_API_KEY=your_actual_sendgrid_api_key
+   SENDER_EMAIL=verified@sender.com
+   RECIPIENT_EMAIL=your@email.com
+   ```
+3. Run the bot - you'll receive a beautiful HTML email with all new concerts!
+
+**Email Features:**
+- 🎨 Clean, professional HTML design with Spotify green branding
+- 🎫 Direct "Get Tickets" buttons for each concert
+- 📧 Plain text fallback for email clients that don't support HTML
+- 📱 Mobile-friendly responsive design
 
 ## Running Weekly (GitHub Actions)
 
@@ -142,9 +174,18 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}
+          SEARCH_RADIUS: ${{ secrets.SEARCH_RADIUS }}
+          SEND_EMAIL_NOTIFICATIONS: ${{ secrets.SEND_EMAIL_NOTIFICATIONS }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
 ```
 
-2. Add your API credentials as GitHub Secrets in your repo settings
+2. Add your API credentials as GitHub Secrets in your repo settings (Settings → Secrets and variables → Actions → New repository secret):
+   - Required: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `TICKETMASTER_API_KEY`, `LATITUDE`, `LONGITUDE`, `SEARCH_RADIUS`
+   - Optional for email: `SEND_EMAIL_NOTIFICATIONS` (set to `true`), `SENDGRID_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`
 
 ## Manual Testing
 
@@ -176,10 +217,17 @@ python concert_bot.py
 **Rate limits**
 - Ticketmaster free tier: 5,000 calls/day (plenty for 500 artists)
 - Spotify: Generous rate limits for personal use
+- SendGrid free tier: 100 emails/day (perfect for daily/weekly runs)
+
+**Email not sending**
+- Check that `SEND_EMAIL_NOTIFICATIONS=true` in your `.env`
+- Verify your SendGrid API key is correct
+- Make sure your sender email is verified in SendGrid
+- Check SendGrid dashboard for error logs
 
 ## Future Enhancements
 
-- [ ] Email notifications
+- [x] Email notifications (via SendGrid)
 - [ ] Discord/Slack webhooks
 - [ ] Filter by venue type
 - [ ] Price alerts

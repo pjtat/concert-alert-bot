@@ -27,6 +27,9 @@ all_artists.txt
 .cache
 .cache-*
 
+# Test scripts
+test_email.py
+
 # IDE
 .vscode/
 .idea/

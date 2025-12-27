@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import requests
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content
 import config
 
 # Suppress SSL warnings
@@ -224,6 +226,103 @@ Tickets: {url}
 """
         return alert
 
+    def send_email(self, new_concerts):
+        """Send email notification via SendGrid."""
+        if not config.SEND_EMAIL_NOTIFICATIONS:
+            return
+
+        if not config.SENDGRID_API_KEY or not config.SENDER_EMAIL or not config.RECIPIENT_EMAIL:
+            print("⚠️  Email notifications enabled but missing configuration. Skipping email.")
+            return
+
+        if not new_concerts:
+            return
+
+        # Build email content
+        subject = f"🎵 {len(new_concerts)} New Concert Alert{'s' if len(new_concerts) > 1 else ''}!"
+
+        # Create HTML content
+        html_content = """
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .header { background-color: #1DB954; color: white; padding: 20px; text-align: center; }
+                .concert { border: 1px solid #ddd; margin: 15px 0; padding: 15px; border-radius: 5px; }
+                .artist { font-size: 18px; font-weight: bold; color: #1DB954; }
+                .event { font-size: 16px; margin: 5px 0; }
+                .details { color: #666; margin: 5px 0; }
+                .button { background-color: #1DB954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px; }
+                .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🎵 New Concert Alerts</h1>
+                <p>You have """ + str(len(new_concerts)) + """ new concert""" + ("s" if len(new_concerts) > 1 else "") + """ to check out!</p>
+            </div>
+        """
+
+        for alert in new_concerts:
+            # Parse the alert text to extract concert info
+            lines = alert.strip().split('\n')
+            artist = venue = event = date = url = ""
+
+            for line in lines:
+                if line.startswith('Artist: '):
+                    artist = line.replace('Artist: ', '')
+                elif line.startswith('Event: '):
+                    event = line.replace('Event: ', '')
+                elif line.startswith('Date: '):
+                    date = line.replace('Date: ', '')
+                elif line.startswith('Venue: '):
+                    venue = line.replace('Venue: ', '')
+                elif line.startswith('Tickets: '):
+                    url = line.replace('Tickets: ', '')
+
+            html_content += f"""
+            <div class="concert">
+                <div class="artist">{artist}</div>
+                <div class="event">{event}</div>
+                <div class="details">📅 {date}</div>
+                <div class="details">📍 {venue}</div>
+                <a href="{url}" class="button">Get Tickets</a>
+            </div>
+            """
+
+        html_content += """
+            <div class="footer">
+                <p>You're receiving this because you set up Concert Alert Bot.</p>
+                <p>Happy concert-going! 🎶</p>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Create plain text version
+        text_content = f"You have {len(new_concerts)} new concert alert{'s' if len(new_concerts) > 1 else ''}!\n\n"
+        text_content += "\n".join(new_concerts)
+
+        try:
+            message = Mail(
+                from_email=Email(config.SENDER_EMAIL),
+                to_emails=To(config.RECIPIENT_EMAIL),
+                subject=subject,
+                plain_text_content=Content("text/plain", text_content),
+                html_content=Content("text/html", html_content)
+            )
+
+            sg = SendGridAPIClient(config.SENDGRID_API_KEY)
+            response = sg.send(message)
+
+            if response.status_code == 202:
+                print(f"✅ Email sent successfully to {config.RECIPIENT_EMAIL}")
+            else:
+                print(f"⚠️  Email sent with status code: {response.status_code}")
+
+        except Exception as e:
+            print(f"❌ Error sending email: {e}")
+
     def run(self):
         """Main execution function."""
         print("Starting Concert Alert Bot...")
@@ -273,6 +372,9 @@ Tickets: {url}
                     f.write(alert)
 
             print(f"\n✅ Found {len(new_concerts)} new concert(s)! Check {config.OUTPUT_FILE}")
+
+            # Send email notification
+            self.send_email(new_concerts)
         else:
             print("\n📭 No new concerts found.")
 
