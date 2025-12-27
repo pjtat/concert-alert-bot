@@ -173,7 +173,7 @@ name: Concert Alert Bot
 
 on:
   schedule:
-    - cron: '0 9 * * 1'  # Every Monday 9 AM UTC (1 AM PST)
+    - cron: '0 20 * * 3'  # Every Wednesday 12 PM PST (8 PM UTC)
   workflow_dispatch:  # Allow manual runs
 
 jobs:
@@ -237,7 +237,8 @@ Go to: **Settings** → **Secrets and variables** → **Actions** → **New repo
 - **Curated list:** Your `my_artists.txt` is committed to GitHub (it's not sensitive data)
 - **Spotify follows:** The refresh token lets GitHub Actions check your Spotify follows automatically - no manual updates needed!
 - **New artists:** When you follow someone new on Spotify, the next run will automatically pick them up
-- **Schedule:** Runs every Monday at 9 AM UTC (1 AM PST / 2 AM PDT)
+- **Schedule:** Runs every Wednesday at 12 PM PST (8 PM UTC)
+  - Note: During Daylight Saving Time (PDT), it will run at 1 PM PDT
 
 This gives you the best of both worlds - a curated list backed up in git PLUS automatic syncing with Spotify follows! 🎉
 
