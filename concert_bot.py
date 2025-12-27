@@ -53,13 +53,39 @@ class ConcertBot:
         """Load previously notified concerts from file."""
         if os.path.exists(config.NOTIFIED_CONCERTS_FILE):
             with open(config.NOTIFIED_CONCERTS_FILE, 'r') as f:
-                return json.load(f)
-        return []
+                data = json.load(f)
+                # Handle both old format (list of IDs) and new format (dict with dates)
+                if isinstance(data, list):
+                    # Old format - convert to new format
+                    return {event_id: None for event_id in data}
+                return data
+        return {}
 
     def _save_notified_concerts(self):
         """Save notified concerts to file."""
         with open(config.NOTIFIED_CONCERTS_FILE, 'w') as f:
             json.dump(self.notified_concerts, f, indent=2)
+
+    def _cleanup_past_concerts(self):
+        """Remove concerts that have already happened from tracking."""
+        today = datetime.now().date()
+        to_remove = []
+
+        for event_id, event_date in self.notified_concerts.items():
+            if event_date:
+                try:
+                    concert_date = datetime.strptime(event_date, '%Y-%m-%d').date()
+                    if concert_date < today:
+                        to_remove.append(event_id)
+                except (ValueError, TypeError):
+                    # If we can't parse the date, keep it for now
+                    pass
+
+        for event_id in to_remove:
+            del self.notified_concerts[event_id]
+
+        if to_remove:
+            print(f"Cleaned up {len(to_remove)} past concerts from tracking")
 
     def _load_curated_artists(self):
         """Load artists from manually curated text file."""
@@ -185,10 +211,10 @@ class ConcertBot:
         """Check if concert has already been notified."""
         return event_id in self.notified_concerts
 
-    def add_notified_concert(self, event_id):
-        """Add concert to notified list."""
+    def add_notified_concert(self, event_id, event_date):
+        """Add concert to notified list with its date."""
         if event_id not in self.notified_concerts:
-            self.notified_concerts.append(event_id)
+            self.notified_concerts[event_id] = event_date
 
     def is_tribute_show(self, event):
         """Check if event is a tribute band/cover show."""
@@ -356,6 +382,9 @@ Tickets: {url}
         print(f"Searching for concerts within {config.SEARCH_RADIUS} miles of Los Angeles (lat/long: {config.LATITUDE},{config.LONGITUDE})")
         print()
 
+        # Clean up past concerts from tracking
+        self._cleanup_past_concerts()
+
         # Get artists
         artists = self.get_favorite_artists()
 
@@ -384,9 +413,10 @@ Tickets: {url}
                     continue
 
                 # This is a valid concert!
+                event_date = event.get('dates', {}).get('start', {}).get('localDate', 'N/A')
                 alert = self.format_concert_alert(artist['name'], event)
                 new_concerts.append(alert)
-                self.add_notified_concert(event_id)
+                self.add_notified_concert(event_id, event_date)
                 print(f"  ✓ Found new concert: {event.get('name')}")
 
         # Write alerts to file
