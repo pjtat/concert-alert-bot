@@ -1,0 +1,38 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Data files
+data/
+*.db
+*.sqlite
+notified_concerts.json
+artists_cache.json
+concert_alerts_formatted.txt
+
+# Spotify OAuth cache
+.cache
+.cache-*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+concert_alerts.txt
