@@ -74,26 +74,24 @@ class ConcertBot:
             artists.extend(curated_artists)
             print(f"Loaded {len(curated_artists)} curated artists")
 
+        # Skip Spotify if flag is set (useful for GitHub Actions)
+        if config.SKIP_SPOTIFY:
+            print("Skipping Spotify authentication (SKIP_SPOTIFY=true)")
+            if not artists:
+                print("⚠️  Warning: No artists found! Create my_artists.txt with your favorite artists.")
+            else:
+                print(f"Monitoring {len(artists)} artists total")
+            return artists
+
         # Also fetch followed artists from Spotify to catch any new additions
         print("Checking Spotify for followed artists...")
-        self._init_spotify()
+        try:
+            self._init_spotify()
 
-        followed = self.spotify.current_user_followed_artists(limit=50)
-        spotify_count = 0
-        for item in followed['artists']['items']:
-            # Add if not already in list (case-insensitive comparison)
-            if not any(a['name'].lower() == item['name'].lower() for a in artists):
-                artists.append({
-                    'name': item['name'],
-                    'id': item['id'],
-                    'source': 'spotify_followed'
-                })
-                spotify_count += 1
-
-        # Handle pagination for followed artists
-        while followed['artists']['next']:
-            followed = self.spotify.next(followed['artists'])
+            followed = self.spotify.current_user_followed_artists(limit=50)
+            spotify_count = 0
             for item in followed['artists']['items']:
+                # Add if not already in list (case-insensitive comparison)
                 if not any(a['name'].lower() == item['name'].lower() for a in artists):
                     artists.append({
                         'name': item['name'],
@@ -102,10 +100,26 @@ class ConcertBot:
                     })
                     spotify_count += 1
 
-        if spotify_count > 0:
-            print(f"Added {spotify_count} new artists from Spotify follows")
-        else:
-            print("No new artists found on Spotify")
+            # Handle pagination for followed artists
+            while followed['artists']['next']:
+                followed = self.spotify.next(followed['artists'])
+                for item in followed['artists']['items']:
+                    if not any(a['name'].lower() == item['name'].lower() for a in artists):
+                        artists.append({
+                            'name': item['name'],
+                            'id': item['id'],
+                            'source': 'spotify_followed'
+                        })
+                        spotify_count += 1
+
+            if spotify_count > 0:
+                print(f"Added {spotify_count} new artists from Spotify follows")
+            else:
+                print("No new artists found on Spotify")
+
+        except Exception as e:
+            print(f"⚠️  Could not connect to Spotify: {e}")
+            print("Continuing with curated artist list only...")
 
         print(f"Monitoring {len(artists)} artists total")
 

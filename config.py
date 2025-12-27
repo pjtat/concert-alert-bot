@@ -35,3 +35,6 @@ SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 SENDER_EMAIL = os.getenv('SENDER_EMAIL')  # Must be verified in SendGrid
 RECIPIENT_EMAIL = os.getenv('RECIPIENT_EMAIL')
 SEND_EMAIL_NOTIFICATIONS = os.getenv('SEND_EMAIL_NOTIFICATIONS', 'false').lower() == 'true'
+
+# Skip Spotify (useful for GitHub Actions where OAuth doesn't work)
+SKIP_SPOTIFY = os.getenv('SKIP_SPOTIFY', 'false').lower() == 'true'

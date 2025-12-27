@@ -148,44 +148,53 @@ To receive email alerts when new concerts are found:
 
 ## Running Weekly (GitHub Actions)
 
-To automate weekly runs:
+The workflow file is already set up in `.github/workflows/concert-bot.yml` to run every Monday at 9 AM UTC.
 
-1. Create `.github/workflows/concert-bot.yml`:
+### Setup GitHub Secrets
 
+GitHub Actions needs your configuration as secrets. Go to your repo on GitHub:
+
+**Settings → Secrets and variables → Actions → New repository secret**
+
+Add these secrets one by one:
+
+**Required Secrets:**
+1. `MY_ARTISTS` - Your artist list (copy contents of your `my_artists.txt` file)
+   ```
+   Arctic Monkeys
+   Beyoncé
+   Foo Fighters
+   ...
+   ```
+2. `TICKETMASTER_API_KEY` - Your Ticketmaster API key
+3. `LATITUDE` - `34.0522` (or your location)
+4. `LONGITUDE` - `-118.2437` (or your location)
+5. `SEARCH_RADIUS` - `40` (miles)
+
+**Optional Secrets (for email notifications):**
+6. `SEND_EMAIL_NOTIFICATIONS` - `true`
+7. `SENDGRID_API_KEY` - Your SendGrid API key
+8. `SENDER_EMAIL` - Your verified sender email
+9. `RECIPIENT_EMAIL` - Where to send concert alerts
+
+### Test Your Workflow
+
+1. Go to **Actions** tab in your GitHub repo
+2. Click **Concert Alert Bot** workflow
+3. Click **Run workflow** → **Run workflow** (manual trigger)
+4. Watch it run and check for any errors
+5. If email is enabled, you'll receive an email with any new concerts found!
+
+### Schedule
+
+The bot runs automatically every **Monday at 9 AM UTC** (1 AM PST / 2 AM PDT).
+
+You can change the schedule by editing `.github/workflows/concert-bot.yml` and modifying the cron expression:
 ```yaml
-name: Concert Alert Bot
-
-on:
-  schedule:
-    - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC
-  workflow_dispatch:  # Allow manual runs
-
-jobs:
-  run-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: python concert_bot.py
-        env:
-          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
-          LATITUDE: ${{ secrets.LATITUDE }}
-          LONGITUDE: ${{ secrets.LONGITUDE }}
-          SEARCH_RADIUS: ${{ secrets.SEARCH_RADIUS }}
-          SEND_EMAIL_NOTIFICATIONS: ${{ secrets.SEND_EMAIL_NOTIFICATIONS }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+- cron: '0 9 * * 1'  # Minute Hour Day Month Weekday
 ```
 
-2. Add your API credentials as GitHub Secrets in your repo settings (Settings → Secrets and variables → Actions → New repository secret):
-   - Required: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `TICKETMASTER_API_KEY`, `LATITUDE`, `LONGITUDE`, `SEARCH_RADIUS`
-   - Optional for email: `SEND_EMAIL_NOTIFICATIONS` (set to `true`), `SENDGRID_API_KEY`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`
+**Note:** GitHub Actions uses your curated artist list only (doesn't check Spotify follows) because OAuth authentication doesn't work in automated environments.
 
 ## Manual Testing
 
