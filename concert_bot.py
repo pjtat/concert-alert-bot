@@ -28,12 +28,25 @@ class ConcertBot:
     def _init_spotify(self):
         """Initialize Spotify client with OAuth (lazy)."""
         if self.spotify is None:
-            self.spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(
-                client_id=config.SPOTIFY_CLIENT_ID,
-                client_secret=config.SPOTIFY_CLIENT_SECRET,
-                redirect_uri=config.SPOTIFY_REDIRECT_URI,
-                scope=config.SPOTIFY_SCOPES
-            ))
+            # If refresh token is provided (e.g., in GitHub Actions), use it
+            if config.SPOTIFY_REFRESH_TOKEN:
+                auth_manager = SpotifyOAuth(
+                    client_id=config.SPOTIFY_CLIENT_ID,
+                    client_secret=config.SPOTIFY_CLIENT_SECRET,
+                    redirect_uri=config.SPOTIFY_REDIRECT_URI,
+                    scope=config.SPOTIFY_SCOPES
+                )
+                # Manually set the refresh token
+                token_info = auth_manager.refresh_access_token(config.SPOTIFY_REFRESH_TOKEN)
+                self.spotify = spotipy.Spotify(auth=token_info['access_token'])
+            else:
+                # Normal OAuth flow (requires browser)
+                self.spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(
+                    client_id=config.SPOTIFY_CLIENT_ID,
+                    client_secret=config.SPOTIFY_CLIENT_SECRET,
+                    redirect_uri=config.SPOTIFY_REDIRECT_URI,
+                    scope=config.SPOTIFY_SCOPES
+                ))
         return self.spotify
 
     def _load_notified_concerts(self):

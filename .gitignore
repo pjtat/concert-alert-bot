@@ -20,15 +20,16 @@ artists_cache.json
 concert_alerts_formatted.txt
 
 # Personal artist lists (use .example files as templates)
-my_artists.txt
+# Note: my_artists.txt is now tracked in git so GitHub Actions can use it
 all_artists.txt
 
 # Spotify OAuth cache
 .cache
 .cache-*
 
-# Test scripts
+# Test and utility scripts
 test_email.py
+get_spotify_token.py
 
 # IDE
 .vscode/

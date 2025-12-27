@@ -148,53 +148,98 @@ To receive email alerts when new concerts are found:
 
 ## Running Weekly (GitHub Actions)
 
-The workflow file is already set up in `.github/workflows/concert-bot.yml` to run every Monday at 9 AM UTC.
+GitHub Actions can run the bot automatically every week AND check your Spotify for new followed artists!
 
-### Setup GitHub Secrets
+### Step 1: Get Your Spotify Refresh Token
 
-GitHub Actions needs your configuration as secrets. Go to your repo on GitHub:
+After running the bot locally at least once (to authenticate with Spotify), run:
 
-**Settings → Secrets and variables → Actions → New repository secret**
-
-Add these secrets one by one:
-
-**Required Secrets:**
-1. `MY_ARTISTS` - Your artist list (copy contents of your `my_artists.txt` file)
-   ```
-   Arctic Monkeys
-   Beyoncé
-   Foo Fighters
-   ...
-   ```
-2. `TICKETMASTER_API_KEY` - Your Ticketmaster API key
-3. `LATITUDE` - `34.0522` (or your location)
-4. `LONGITUDE` - `-118.2437` (or your location)
-5. `SEARCH_RADIUS` - `40` (miles)
-
-**Optional Secrets (for email notifications):**
-6. `SEND_EMAIL_NOTIFICATIONS` - `true`
-7. `SENDGRID_API_KEY` - Your SendGrid API key
-8. `SENDER_EMAIL` - Your verified sender email
-9. `RECIPIENT_EMAIL` - Where to send concert alerts
-
-### Test Your Workflow
-
-1. Go to **Actions** tab in your GitHub repo
-2. Click **Concert Alert Bot** workflow
-3. Click **Run workflow** → **Run workflow** (manual trigger)
-4. Watch it run and check for any errors
-5. If email is enabled, you'll receive an email with any new concerts found!
-
-### Schedule
-
-The bot runs automatically every **Monday at 9 AM UTC** (1 AM PST / 2 AM PDT).
-
-You can change the schedule by editing `.github/workflows/concert-bot.yml` and modifying the cron expression:
-```yaml
-- cron: '0 9 * * 1'  # Minute Hour Day Month Weekday
+```bash
+python get_spotify_token.py
 ```
 
-**Note:** GitHub Actions uses your curated artist list only (doesn't check Spotify follows) because OAuth authentication doesn't work in automated environments.
+This will print your Spotify refresh token. Copy it - you'll need it for GitHub Secrets.
+
+### Step 2: Create GitHub Workflow File
+
+Go to https://github.com/YOUR_USERNAME/concert-alert-bot and create a new file:
+
+1. Click **Add file** → **Create new file**
+2. Name: `.github/workflows/concert-bot.yml`
+3. Paste this content:
+
+```yaml
+name: Concert Alert Bot
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday 9 AM UTC (1 AM PST)
+  workflow_dispatch:  # Allow manual runs
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python concert_bot.py
+        env:
+          # Spotify
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          # Ticketmaster
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}
+          SEARCH_RADIUS: ${{ secrets.SEARCH_RADIUS }}
+          # SendGrid (optional)
+          SEND_EMAIL_NOTIFICATIONS: ${{ secrets.SEND_EMAIL_NOTIFICATIONS }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+```
+
+4. Click **Commit changes**
+
+### Step 3: Add GitHub Secrets
+
+Go to: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+**Required Secrets:**
+- `SPOTIFY_CLIENT_ID` - Your Spotify Client ID
+- `SPOTIFY_CLIENT_SECRET` - Your Spotify Client Secret
+- `SPOTIFY_REFRESH_TOKEN` - From `get_spotify_token.py` (allows automatic Spotify checking!)
+- `TICKETMASTER_API_KEY` - Your Ticketmaster API key
+- `LATITUDE` - `34.0522` (or your location)
+- `LONGITUDE` - `-118.2437` (or your location)
+- `SEARCH_RADIUS` - `40` (in miles)
+
+**Optional (for email notifications):**
+- `SEND_EMAIL_NOTIFICATIONS` - `true`
+- `SENDGRID_API_KEY` - Your SendGrid API key
+- `SENDER_EMAIL` - `pjtatano@gmail.com` (or your verified email)
+- `RECIPIENT_EMAIL` - `pjtatano@gmail.com` (or where to receive alerts)
+
+### Step 4: Test Your Workflow
+
+1. Go to **Actions** tab
+2. Click **Concert Alert Bot**
+3. Click **Run workflow** → **Run workflow**
+4. Watch it run!
+5. Check your email for concert alerts
+
+### How It Works
+
+- **Curated list:** Your `my_artists.txt` is committed to GitHub (it's not sensitive data)
+- **Spotify follows:** The refresh token lets GitHub Actions check your Spotify follows automatically - no manual updates needed!
+- **New artists:** When you follow someone new on Spotify, the next run will automatically pick them up
+- **Schedule:** Runs every Monday at 9 AM UTC (1 AM PST / 2 AM PDT)
+
+This gives you the best of both worlds - a curated list backed up in git PLUS automatic syncing with Spotify follows! 🎉
 
 ## Manual Testing
 
