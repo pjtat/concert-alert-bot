@@ -15,7 +15,7 @@ ENV/
 data/
 *.db
 *.sqlite
-notified_concerts.json
+# notified_concerts.json - MUST be tracked for GitHub Actions to work
 artists_cache.json
 concert_alerts_formatted.txt
 
