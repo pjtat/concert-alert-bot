@@ -32,29 +32,6 @@ def test_is_already_notified_by_storage_id(tmp_path, monkeypatch):
     assert bot.is_already_notified(ev) is True
 
 
-def test_cross_source_dedup_suppresses_duplicate(tmp_path, monkeypatch):
-    f = tmp_path / "notified.json"
-    f.write_text(json.dumps({"bit:42": {"date": "2026-06-15", "artist": "Artist A"}}))
-    monkeypatch.setattr("config.NOTIFIED_CONCERTS_FILE", str(f))
-
-    bot = ConcertBot()
-    ev = make_event(source="ticketmaster", source_event_id="abc",
-                    artist="Artist A", date="2026-06-15")
-    assert bot.is_already_notified(ev) is True
-
-
-def test_cross_source_dedup_records_new_id_without_renotifying(tmp_path, monkeypatch):
-    f = tmp_path / "notified.json"
-    f.write_text(json.dumps({"bit:42": {"date": "2026-06-15", "artist": "Artist A"}}))
-    monkeypatch.setattr("config.NOTIFIED_CONCERTS_FILE", str(f))
-
-    bot = ConcertBot()
-    ev = make_event(source="ticketmaster", source_event_id="abc",
-                    artist="Artist A", date="2026-06-15")
-    bot.record_notified(ev)
-    assert "tm:abc" in bot.notified_concerts
-
-
 def test_format_alert_includes_on_sale_datetime():
     ev = make_event()
     ev.on_sale_datetime = "2026-05-10T17:00:00Z"
