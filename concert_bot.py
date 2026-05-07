@@ -1,445 +1,333 @@
 #!/usr/bin/env python3
-"""
-Concert Alert Bot
-Monitors upcoming concerts for your favorite Spotify artists in your area.
-"""
-
+"""Concert Alert Bot — orchestrator across multiple data sources."""
 import json
 import os
-import time
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import List, Optional
+
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import requests
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
-import config
 
-# Suppress SSL warnings
+import config
+from sources import ticketmaster, bandsintown
+from sources.normalize import NormalizedEvent, dedup_key
+
 warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL')
 
 
 class ConcertBot:
     def __init__(self):
-        self.spotify = None  # Lazy initialization
+        self.spotify = None
         self.notified_concerts = self._load_notified_concerts()
 
-    def _init_spotify(self):
-        """Initialize Spotify client with OAuth (lazy)."""
-        if self.spotify is None:
-            # If refresh token is provided (e.g., in GitHub Actions), use it
-            if config.SPOTIFY_REFRESH_TOKEN:
-                auth_manager = SpotifyOAuth(
-                    client_id=config.SPOTIFY_CLIENT_ID,
-                    client_secret=config.SPOTIFY_CLIENT_SECRET,
-                    redirect_uri=config.SPOTIFY_REDIRECT_URI,
-                    scope=config.SPOTIFY_SCOPES
-                )
-                # Manually set the refresh token
-                token_info = auth_manager.refresh_access_token(config.SPOTIFY_REFRESH_TOKEN)
-                self.spotify = spotipy.Spotify(auth=token_info['access_token'])
-            else:
-                # Normal OAuth flow (requires browser)
-                self.spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(
-                    client_id=config.SPOTIFY_CLIENT_ID,
-                    client_secret=config.SPOTIFY_CLIENT_SECRET,
-                    redirect_uri=config.SPOTIFY_REDIRECT_URI,
-                    scope=config.SPOTIFY_SCOPES
-                ))
-        return self.spotify
+    # ---------------- Notified-concerts storage ----------------
 
-    def _load_notified_concerts(self):
-        """Load previously notified concerts from file."""
-        if os.path.exists(config.NOTIFIED_CONCERTS_FILE):
-            with open(config.NOTIFIED_CONCERTS_FILE, 'r') as f:
-                data = json.load(f)
-                # Handle both old format (list of IDs) and new format (dict with dates)
-                if isinstance(data, list):
-                    # Old format - convert to new format
-                    return {event_id: None for event_id in data}
-                return data
-        return {}
+    def _load_notified_concerts(self) -> dict:
+        if not os.path.exists(config.NOTIFIED_CONCERTS_FILE):
+            return {}
+        with open(config.NOTIFIED_CONCERTS_FILE, 'r') as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            data = {k: None for k in data}
+        return self._migrate_notified(data)
+
+    def _migrate_notified(self, data: dict) -> dict:
+        """Prefix unprefixed keys with `tm:` and expand values to {date, artist}."""
+        migrated = {}
+        for k, v in data.items():
+            new_key = k if (":" in k and k.split(":", 1)[0] in ("tm", "bit")) else f"tm:{k}"
+            if isinstance(v, dict):
+                new_val = {"date": v.get("date"), "artist": v.get("artist")}
+            else:
+                new_val = {"date": v, "artist": None}
+            migrated[new_key] = new_val
+        return migrated
 
     def _save_notified_concerts(self):
-        """Save notified concerts to file."""
         with open(config.NOTIFIED_CONCERTS_FILE, 'w') as f:
             json.dump(self.notified_concerts, f, indent=2)
 
     def _cleanup_past_concerts(self):
-        """Remove concerts that have already happened from tracking."""
         today = datetime.now().date()
         to_remove = []
-
-        for event_id, event_date in self.notified_concerts.items():
-            if event_date:
-                try:
-                    concert_date = datetime.strptime(event_date, '%Y-%m-%d').date()
-                    if concert_date < today:
-                        to_remove.append(event_id)
-                except (ValueError, TypeError):
-                    # If we can't parse the date, keep it for now
-                    pass
-
-        for event_id in to_remove:
-            del self.notified_concerts[event_id]
-
+        for sid, meta in self.notified_concerts.items():
+            date_str = meta.get("date") if isinstance(meta, dict) else None
+            if not date_str:
+                continue
+            try:
+                if datetime.strptime(date_str, '%Y-%m-%d').date() < today:
+                    to_remove.append(sid)
+            except (ValueError, TypeError):
+                pass
+        for sid in to_remove:
+            del self.notified_concerts[sid]
         if to_remove:
             print(f"Cleaned up {len(to_remove)} past concerts from tracking")
 
-    def _load_curated_artists(self):
-        """Load artists from manually curated text file."""
+    def is_already_notified(self, event: NormalizedEvent) -> bool:
+        if event.storage_id in self.notified_concerts:
+            return True
+        # Cross-source dedup by (artist, date)
+        target = dedup_key(event)
+        for meta in self.notified_concerts.values():
+            if not isinstance(meta, dict):
+                continue
+            artist = meta.get("artist")
+            date = meta.get("date")
+            if artist and date and (artist.strip().lower(), date) == target:
+                return True
+        return False
+
+    def record_notified(self, event: NormalizedEvent):
+        self.notified_concerts[event.storage_id] = {
+            "date": event.local_date,
+            "artist": event.artist,
+        }
+
+    # ---------------- Spotify (unchanged behavior) ----------------
+
+    def _init_spotify(self):
+        if self.spotify is not None:
+            return self.spotify
+        if config.SPOTIFY_REFRESH_TOKEN:
+            auth = SpotifyOAuth(
+                client_id=config.SPOTIFY_CLIENT_ID,
+                client_secret=config.SPOTIFY_CLIENT_SECRET,
+                redirect_uri=config.SPOTIFY_REDIRECT_URI,
+                scope=config.SPOTIFY_SCOPES,
+            )
+            token = auth.refresh_access_token(config.SPOTIFY_REFRESH_TOKEN)
+            self.spotify = spotipy.Spotify(auth=token['access_token'])
+        else:
+            self.spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(
+                client_id=config.SPOTIFY_CLIENT_ID,
+                client_secret=config.SPOTIFY_CLIENT_SECRET,
+                redirect_uri=config.SPOTIFY_REDIRECT_URI,
+                scope=config.SPOTIFY_SCOPES,
+            ))
+        return self.spotify
+
+    def _load_curated_artists(self) -> List[dict]:
         artists = []
         with open(config.MY_ARTISTS_FILE, 'r') as f:
             for line in f:
                 line = line.strip()
-                # Skip empty lines and comments
                 if line and not line.startswith('#'):
-                    artists.append({
-                        'name': line,
-                        'id': None,  # We don't need Spotify ID for Ticketmaster search
-                        'source': 'manual'
-                    })
+                    artists.append({'name': line, 'id': None, 'source': 'manual'})
         return artists
 
-    def get_favorite_artists(self):
-        """Get user's curated artists merged with Spotify followed artists."""
+    def get_favorite_artists(self) -> List[dict]:
         artists = []
-
-        # Load curated artist list
         if os.path.exists(config.MY_ARTISTS_FILE):
             print(f"Loading curated artist list from {config.MY_ARTISTS_FILE}...")
-            curated_artists = self._load_curated_artists()
-            artists.extend(curated_artists)
-            print(f"Loaded {len(curated_artists)} curated artists")
+            curated = self._load_curated_artists()
+            artists.extend(curated)
+            print(f"Loaded {len(curated)} curated artists")
 
-        # Skip Spotify if flag is set (useful for GitHub Actions)
         if config.SKIP_SPOTIFY:
             print("Skipping Spotify authentication (SKIP_SPOTIFY=true)")
-            if not artists:
-                print("⚠️  Warning: No artists found! Create my_artists.txt with your favorite artists.")
-            else:
-                print(f"Monitoring {len(artists)} artists total")
+            print(f"Monitoring {len(artists)} artists total")
             return artists
 
-        # Also fetch followed artists from Spotify to catch any new additions
         print("Checking Spotify for followed artists...")
         try:
             self._init_spotify()
-
             followed = self.spotify.current_user_followed_artists(limit=50)
-            spotify_count = 0
-            for item in followed['artists']['items']:
-                # Add if not already in list (case-insensitive comparison)
-                if not any(a['name'].lower() == item['name'].lower() for a in artists):
-                    artists.append({
-                        'name': item['name'],
-                        'id': item['id'],
-                        'source': 'spotify_followed'
-                    })
-                    spotify_count += 1
-
-            # Handle pagination for followed artists
-            while followed['artists']['next']:
-                followed = self.spotify.next(followed['artists'])
+            added = 0
+            while True:
                 for item in followed['artists']['items']:
                     if not any(a['name'].lower() == item['name'].lower() for a in artists):
-                        artists.append({
-                            'name': item['name'],
-                            'id': item['id'],
-                            'source': 'spotify_followed'
-                        })
-                        spotify_count += 1
-
-            if spotify_count > 0:
-                print(f"Added {spotify_count} new artists from Spotify follows")
-            else:
-                print("No new artists found on Spotify")
-
+                        artists.append({'name': item['name'], 'id': item['id'], 'source': 'spotify_followed'})
+                        added += 1
+                if not followed['artists']['next']:
+                    break
+                followed = self.spotify.next(followed['artists'])
+            print(f"Added {added} new artists from Spotify follows" if added else "No new artists found on Spotify")
         except Exception as e:
-            print(f"⚠️  Could not connect to Spotify: {e}")
+            print(f"Could not connect to Spotify: {e}")
             print("Continuing with curated artist list only...")
 
         print(f"Monitoring {len(artists)} artists total")
-
-        # Cache artists
         with open(config.ARTISTS_CACHE_FILE, 'w') as f:
             json.dump(artists, f, indent=2)
-
         return artists
 
-    def search_concerts(self, artist_name):
-        """Search for concerts by artist name using Ticketmaster API."""
-        url = f"{config.TICKETMASTER_BASE_URL}/events.json"
+    # ---------------- Source orchestration ----------------
 
-        # Calculate date range
-        start_date = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-        end_date = (datetime.now() + timedelta(days=30 * config.SEARCH_WINDOW_MONTHS)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    def collect_events(self, artist_name: str) -> List[NormalizedEvent]:
+        """Query all enabled sources for an artist and return normalized events."""
+        events: List[NormalizedEvent] = []
 
-        params = {
-            'apikey': config.TICKETMASTER_API_KEY,
-            'keyword': artist_name,
-            'latlong': f'{config.LATITUDE},{config.LONGITUDE}',
-            'radius': config.SEARCH_RADIUS,
-            'unit': 'miles',
-            'classificationName': 'music',
-            'startDateTime': start_date,
-            'endDateTime': end_date,
-            'sort': 'date,asc'
-        }
+        for raw in ticketmaster.search(
+            api_key=config.TICKETMASTER_API_KEY,
+            artist_name=artist_name,
+            latitude=config.LATITUDE,
+            longitude=config.LONGITUDE,
+            radius_miles=config.SEARCH_RADIUS,
+            search_window_months=config.SEARCH_WINDOW_MONTHS,
+        ):
+            if ticketmaster.is_tribute_show(raw):
+                continue
+            if not ticketmaster.is_artist_match(raw, artist_name):
+                continue
+            events.append(ticketmaster.normalize_event(raw, search_artist=artist_name))
 
+        if config.ENABLE_BANDSINTOWN:
+            for raw in bandsintown.search(
+                app_id=config.BANDSINTOWN_APP_ID,
+                artist_name=artist_name,
+                latitude=config.LATITUDE,
+                longitude=config.LONGITUDE,
+                radius_miles=config.SEARCH_RADIUS,
+                search_window_months=config.SEARCH_WINDOW_MONTHS,
+            ):
+                events.append(bandsintown.normalize_event(raw, search_artist=artist_name))
+
+        return events
+
+    # ---------------- Formatting ----------------
+
+    @staticmethod
+    def _fmt_dt(iso: Optional[str]) -> str:
+        if not iso:
+            return "TBA"
         try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
+            return datetime.fromisoformat(iso.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M %Z").strip()
+        except ValueError:
+            return iso
 
-            # Rate limiting: wait 0.5 seconds between requests
-            time.sleep(0.5)
-
-            if '_embedded' in data and 'events' in data['_embedded']:
-                return data['_embedded']['events']
-            return []
-        except requests.exceptions.RequestException as e:
-            print(f"Error searching concerts for {artist_name}: {e}")
-            # If rate limited, wait longer before next request
-            if '429' in str(e):
-                print("  Rate limited - waiting 5 seconds...")
-                time.sleep(5)
-            return []
-
-    def is_concert_notified(self, event_id):
-        """Check if concert has already been notified."""
-        return event_id in self.notified_concerts
-
-    def add_notified_concert(self, event_id, event_date):
-        """Add concert to notified list with its date."""
-        if event_id not in self.notified_concerts:
-            self.notified_concerts[event_id] = event_date
-
-    def is_tribute_show(self, event):
-        """Check if event is a tribute band/cover show."""
-        event_name = event.get('name', '').lower()
-
-        # Keywords that indicate tribute/cover shows
-        tribute_keywords = [
-            'tribute', 'tributes', 'cover', 'covers',
-            'experience', 'reimagined', 'celebration',
-            'vs.', 'vs ', 'night with dj', 'starring'
+    def format_concert_alert(self, event: NormalizedEvent) -> str:
+        time_str = event.local_time or "TBA"
+        lines = [
+            "=" * 80,
+            f"NEW CONCERT ALERT! [{event.source}]",
+            "=" * 80,
+            f"Artist: {event.artist}",
+            f"Event: {event.event_name}",
+            f"Date: {event.local_date} at {time_str}",
+            f"Venue: {event.venue_name}, {event.city}",
+            f"Tickets: {event.ticket_url}",
         ]
+        if event.on_sale_datetime:
+            lines.append(f"On-sale: {self._fmt_dt(event.on_sale_datetime)}")
+        if event.presales:
+            lines.append("Presales:")
+            for p in event.presales:
+                lines.append(f"  - {p.name}: {self._fmt_dt(p.start_datetime)} -> {self._fmt_dt(p.end_datetime)}")
+        lines.append("=" * 80)
+        return "\n".join(lines) + "\n"
 
-        for keyword in tribute_keywords:
-            if keyword in event_name:
-                return True
+    # ---------------- Email ----------------
 
-        return False
-
-    def is_artist_match(self, event, search_artist):
-        """Verify the performing artist matches the search query."""
-        search_lower = search_artist.lower()
-
-        # Check if attractions (performers) data exists
-        if '_embedded' not in event or 'attractions' not in event['_embedded']:
-            # No performer data, fall back to name matching
-            event_name = event.get('name', '').lower()
-            return search_lower in event_name
-
-        # Check actual performers
-        for attraction in event['_embedded']['attractions']:
-            attraction_name = attraction.get('name', '').lower()
-
-            # Exact match or very close match
-            if search_lower == attraction_name:
-                return True
-
-            # Handle cases like "The Weeknd" vs "Weeknd"
-            if search_lower.replace('the ', '') == attraction_name.replace('the ', ''):
-                return True
-
-        return False
-
-    def format_concert_alert(self, artist_name, event):
-        """Format concert information for notification."""
-        event_name = event.get('name', 'N/A')
-        event_date = event.get('dates', {}).get('start', {}).get('localDate', 'N/A')
-        event_time = event.get('dates', {}).get('start', {}).get('localTime', 'N/A')
-        venue = event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'N/A')
-        city = event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'N/A')
-        url = event.get('url', 'N/A')
-
-        alert = f"""
-{'='*80}
-🎵 NEW CONCERT ALERT!
-{'='*80}
-Artist: {artist_name}
-Event: {event_name}
-Date: {event_date} at {event_time}
-Venue: {venue}, {city}
-Tickets: {url}
-{'='*80}
-"""
-        return alert
-
-    def send_email(self, new_concerts):
-        """Send email notification via SendGrid."""
+    def send_email(self, alerts: List[str], events: List[NormalizedEvent]):
         if not config.SEND_EMAIL_NOTIFICATIONS:
+            print("Email notifications disabled (SEND_EMAIL_NOTIFICATIONS=false)")
+            return
+        if not alerts:
+            print("No new concerts -- skipping email")
+            return
+        if not (config.SENDGRID_API_KEY and config.SENDER_EMAIL and config.RECIPIENT_EMAIL):
+            print("Email enabled but SendGrid config missing. Skipping email.")
             return
 
-        if not config.SENDGRID_API_KEY or not config.SENDER_EMAIL or not config.RECIPIENT_EMAIL:
-            print("⚠️  Email notifications enabled but missing configuration. Skipping email.")
-            return
-
-        if not new_concerts:
-            return
-
-        # Build email content
-        subject = f"🎵 {len(new_concerts)} New Concert Alert{'s' if len(new_concerts) > 1 else ''}!"
-
-        # Create HTML content
-        html_content = """
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .header { background-color: #1DB954; color: white; padding: 20px; text-align: center; }
-                .concert { border: 1px solid #ddd; margin: 15px 0; padding: 15px; border-radius: 5px; }
-                .artist { font-size: 18px; font-weight: bold; color: #1DB954; }
-                .event { font-size: 16px; margin: 5px 0; }
-                .details { color: #666; margin: 5px 0; }
-                .button { background-color: #1DB954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px; }
-                .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>🎵 New Concert Alerts</h1>
-                <p>You have """ + str(len(new_concerts)) + """ new concert""" + ("s" if len(new_concerts) > 1 else "") + """ to check out!</p>
-            </div>
-        """
-
-        for alert in new_concerts:
-            # Parse the alert text to extract concert info
-            lines = alert.strip().split('\n')
-            artist = venue = event = date = url = ""
-
-            for line in lines:
-                if line.startswith('Artist: '):
-                    artist = line.replace('Artist: ', '')
-                elif line.startswith('Event: '):
-                    event = line.replace('Event: ', '')
-                elif line.startswith('Date: '):
-                    date = line.replace('Date: ', '')
-                elif line.startswith('Venue: '):
-                    venue = line.replace('Venue: ', '')
-                elif line.startswith('Tickets: '):
-                    url = line.replace('Tickets: ', '')
-
-            html_content += f"""
-            <div class="concert">
-                <div class="artist">{artist}</div>
-                <div class="event">{event}</div>
-                <div class="details">📅 {date}</div>
-                <div class="details">📍 {venue}</div>
-                <a href="{url}" class="button">Get Tickets</a>
-            </div>
-            """
-
-        html_content += """
-            <div class="footer">
-                <p>You're receiving this because you set up Concert Alert Bot.</p>
-                <p>Happy concert-going! 🎶</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        # Create plain text version
-        text_content = f"You have {len(new_concerts)} new concert alert{'s' if len(new_concerts) > 1 else ''}!\n\n"
-        text_content += "\n".join(new_concerts)
+        subject = f"{len(alerts)} New Concert Alert{'s' if len(alerts) > 1 else ''}!"
+        html = self._build_html(events)
+        text = f"You have {len(alerts)} new concert alert{'s' if len(alerts) > 1 else ''}!\n\n" + "\n".join(alerts)
 
         try:
             message = Mail(
                 from_email=Email(config.SENDER_EMAIL),
                 to_emails=To(config.RECIPIENT_EMAIL),
                 subject=subject,
-                plain_text_content=Content("text/plain", text_content),
-                html_content=Content("text/html", html_content)
+                plain_text_content=Content("text/plain", text),
+                html_content=Content("text/html", html),
             )
-
             sg = SendGridAPIClient(config.SENDGRID_API_KEY)
             response = sg.send(message)
-
             if response.status_code == 202:
-                print(f"✅ Email sent successfully to {config.RECIPIENT_EMAIL}")
+                print(f"Email sent successfully to {config.RECIPIENT_EMAIL}")
             else:
-                print(f"⚠️  Email sent with status code: {response.status_code}")
-
+                print(f"Email sent with status code: {response.status_code}")
         except Exception as e:
-            print(f"❌ Error sending email: {e}")
+            print(f"Error sending email: {e}")
+
+    def _build_html(self, events: List[NormalizedEvent]) -> str:
+        head = """<html><head><style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .header { background-color: #1DB954; color: white; padding: 20px; text-align: center; }
+            .concert { border: 1px solid #ddd; margin: 15px 0; padding: 15px; border-radius: 5px; }
+            .artist { font-size: 18px; font-weight: bold; color: #1DB954; }
+            .event { font-size: 16px; margin: 5px 0; }
+            .details { color: #666; margin: 5px 0; }
+            .source { font-size: 11px; color: #999; text-transform: uppercase; }
+            .presale { background: #f4f4f4; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 13px; }
+            .button { background-color: #1DB954; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px; }
+            .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; }
+        </style></head><body>"""
+        body = f'<div class="header"><h1>New Concert Alerts</h1><p>You have {len(events)} new concert{"s" if len(events) > 1 else ""} to check out!</p></div>'
+
+        for ev in events:
+            body += f'<div class="concert">'
+            body += f'<div class="source">via {ev.source}</div>'
+            body += f'<div class="artist">{ev.artist}</div>'
+            body += f'<div class="event">{ev.event_name}</div>'
+            body += f'<div class="details">Date: {ev.local_date} at {ev.local_time or "TBA"}</div>'
+            body += f'<div class="details">Venue: {ev.venue_name}, {ev.city}</div>'
+            if ev.on_sale_datetime:
+                body += f'<div class="presale"><strong>On-sale:</strong> {self._fmt_dt(ev.on_sale_datetime)}</div>'
+            for p in ev.presales:
+                body += (f'<div class="presale"><strong>{p.name}:</strong> '
+                         f'{self._fmt_dt(p.start_datetime)} -> {self._fmt_dt(p.end_datetime)}</div>')
+            if ev.ticket_url:
+                body += f'<a href="{ev.ticket_url}" class="button">Get Tickets</a>'
+            body += '</div>'
+
+        body += '<div class="footer"><p>You\'re receiving this because you set up Concert Alert Bot.</p></div></body></html>'
+        return head + body
+
+    # ---------------- Main ----------------
 
     def run(self):
-        """Main execution function."""
         print("Starting Concert Alert Bot...")
-        print(f"Searching for concerts within {config.SEARCH_RADIUS} miles of Los Angeles (lat/long: {config.LATITUDE},{config.LONGITUDE})")
+        print(f"Searching within {config.SEARCH_RADIUS} miles of ({config.LATITUDE}, {config.LONGITUDE})")
+        print(f"Sources: ticketmaster" + (", bandsintown" if config.ENABLE_BANDSINTOWN else ""))
         print()
 
-        # Clean up past concerts from tracking
         self._cleanup_past_concerts()
-
-        # Get artists
         artists = self.get_favorite_artists()
 
-        new_concerts = []
+        new_alerts: List[str] = []
+        new_events: List[NormalizedEvent] = []
 
-        # Search for concerts
         print("\nSearching for concerts...")
         for i, artist in enumerate(artists, 1):
             print(f"[{i}/{len(artists)}] Checking {artist['name']}...")
-
-            events = self.search_concerts(artist['name'])
-
-            for event in events:
-                event_id = event.get('id')
-
-                # Skip if already notified
-                if self.is_concert_notified(event_id):
+            for event in self.collect_events(artist['name']):
+                if self.is_already_notified(event):
+                    self.record_notified(event)  # record cross-source ID without renotifying
                     continue
+                new_alerts.append(self.format_concert_alert(event))
+                new_events.append(event)
+                self.record_notified(event)
+                print(f"  -> [{event.source}] {event.event_name} on {event.local_date}")
 
-                # Filter out tribute shows
-                if self.is_tribute_show(event):
-                    continue
-
-                # Verify artist match
-                if not self.is_artist_match(event, artist['name']):
-                    continue
-
-                # This is a valid concert!
-                event_date = event.get('dates', {}).get('start', {}).get('localDate', 'N/A')
-                alert = self.format_concert_alert(artist['name'], event)
-                new_concerts.append(alert)
-                self.add_notified_concert(event_id, event_date)
-                print(f"  ✓ Found new concert: {event.get('name')}")
-
-        # Write alerts to file
-        if new_concerts:
+        if new_alerts:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             with open(config.OUTPUT_FILE, 'a') as f:
-                f.write(f"\n\nRun at: {timestamp}\n")
-                f.write(f"Found {len(new_concerts)} new concert(s)\n")
-                for alert in new_concerts:
-                    f.write(alert)
-
-            print(f"\n✅ Found {len(new_concerts)} new concert(s)! Check {config.OUTPUT_FILE}")
-
-            # Send email notification
-            self.send_email(new_concerts)
+                f.write(f"\n\nRun at: {timestamp}\nFound {len(new_alerts)} new concert(s)\n")
+                for a in new_alerts:
+                    f.write(a)
+            print(f"\nFound {len(new_alerts)} new concert(s)! Check {config.OUTPUT_FILE}")
+            self.send_email(new_alerts, new_events)
         else:
-            print("\n📭 No new concerts found.")
+            print("\nNo new concerts found -- no email sent.")
 
-        # Save notified concerts
         self._save_notified_concerts()
-        print("\n✅ Done!")
+        print("\nDone!")
 
 
 if __name__ == '__main__':
-    bot = ConcertBot()
-    bot.run()
+    ConcertBot().run()

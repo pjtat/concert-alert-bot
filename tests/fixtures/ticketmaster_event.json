@@ -1,0 +1,37 @@
+{
+  "id": "vv1Fe8vNqw_9Z78685",
+  "name": "The Strokes",
+  "url": "https://www.ticketmaster.com/event/abc",
+  "dates": {
+    "start": {
+      "localDate": "2026-06-15",
+      "localTime": "20:00:00"
+    }
+  },
+  "sales": {
+    "public": {
+      "startDateTime": "2026-05-10T17:00:00Z",
+      "endDateTime": "2026-06-15T03:00:00Z"
+    },
+    "presales": [
+      {
+        "name": "Spotify Presale",
+        "startDateTime": "2026-05-08T17:00:00Z",
+        "endDateTime": "2026-05-09T05:00:00Z"
+      },
+      {
+        "name": "Citi Cardmember Presale",
+        "startDateTime": "2026-05-09T17:00:00Z",
+        "endDateTime": "2026-05-10T05:00:00Z"
+      }
+    ]
+  },
+  "_embedded": {
+    "venues": [
+      {"name": "The Forum", "city": {"name": "Inglewood"}}
+    ],
+    "attractions": [
+      {"name": "The Strokes"}
+    ]
+  }
+}

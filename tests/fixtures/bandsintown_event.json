@@ -1,0 +1,18 @@
+{
+  "id": "1027634985",
+  "url": "https://www.bandsintown.com/e/1027634985",
+  "datetime": "2026-06-15T20:00:00",
+  "on_sale_datetime": "2026-05-10T17:00:00",
+  "venue": {
+    "name": "The Forum",
+    "city": "Inglewood",
+    "region": "CA",
+    "country": "United States",
+    "latitude": "33.9583",
+    "longitude": "-118.3417"
+  },
+  "lineup": ["The Strokes"],
+  "offers": [
+    {"type": "Tickets", "url": "https://www.ticketmaster.com/event/abc", "status": "available"}
+  ]
+}

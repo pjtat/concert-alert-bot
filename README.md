@@ -4,14 +4,23 @@ A lightweight Python bot that monitors upcoming concerts for your favorite Spoti
 
 ## Features
 
-- ✅ Merges your curated artist list with Spotify followed artists automatically
-- ✅ Searches for concerts within a configurable radius of your location (up to 12 months ahead)
-- ✅ Filters out tribute bands and false positive matches
-- ✅ Formatted output with artist summary and monthly grouping
-- ✅ Email notifications via SendGrid (optional)
-- ✅ Writes new concert alerts to a text file
-- ✅ Tracks previously notified concerts to avoid duplicates
-- ✅ Lightweight and easy to run locally or via GitHub Actions
+- Merges your curated artist list with Spotify followed artists automatically
+- Searches **two sources** in parallel: Ticketmaster Discovery API and Bandsintown
+- Surfaces on-sale and presale times in alerts (Spotify Presale, Verified Fan, Citi, etc.)
+- Cross-source deduplication so the same show isn't reported twice
+- Filters out tribute bands and false positive matches
+- Email notifications via SendGrid (optional), only sent when there's something new
+- Tracks previously notified concerts to avoid duplicates
+- Lightweight and easy to run locally or via GitHub Actions
+
+## Data Sources
+
+The bot queries two services in parallel:
+
+- **Ticketmaster Discovery API** — accurate ticket URLs, on-sale times, and structured presale info (Spotify, Verified Fan, Citi, etc.). Caveat: events often appear here close to or at public on-sale, after presale codes have been distributed.
+- **Bandsintown** — artists/managers post tour dates here directly. Often surfaces tour announcements days to weeks before Ticketmaster's Discovery API has them. No structured presale data, but earlier visibility.
+
+Events are deduplicated across sources by `(artist, date)`. The first source to report a show wins the alert; the second source's listing is silently absorbed.
 
 ## Setup Instructions
 
@@ -66,7 +75,12 @@ TICKETMASTER_API_KEY=your_ticketmaster_api_key_here
 LATITUDE=34.0522
 LONGITUDE=-118.2437
 SEARCH_RADIUS=40
+BANDSINTOWN_APP_ID=concert-alert-bot
+ENABLE_BANDSINTOWN=true
 ```
+
+- `BANDSINTOWN_APP_ID` (optional, defaults to `concert-alert-bot`) — any string identifying your app to Bandsintown's free public API. No registration required.
+- `ENABLE_BANDSINTOWN` (optional, defaults to `true`) — set to `false` to disable Bandsintown queries.
 
 ### 4. Create Your Artist List (Optional)
 
@@ -146,9 +160,9 @@ To receive email alerts when new concerts are found:
 - 📧 Plain text fallback for email clients that don't support HTML
 - 📱 Mobile-friendly responsive design
 
-## Running Weekly (GitHub Actions)
+## Running Daily (GitHub Actions)
 
-GitHub Actions can run the bot automatically every week AND check your Spotify for new followed artists!
+GitHub Actions runs the bot automatically every day AND checks your Spotify for new followed artists. Daily runs catch events as soon as they appear in either source, which matters for presales.
 
 ### Step 1: Get Your Spotify Refresh Token
 
@@ -173,7 +187,7 @@ name: Concert Alert Bot
 
 on:
   schedule:
-    - cron: '0 20 * * 3'  # Every Wednesday 12 PM PST (8 PM UTC)
+    - cron: '0 20 * * *'  # Daily at 1 PM PST (8 PM UTC)
   workflow_dispatch:  # Allow manual runs
 
 jobs:
@@ -201,6 +215,9 @@ jobs:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          # Bandsintown
+          BANDSINTOWN_APP_ID: ${{ secrets.BANDSINTOWN_APP_ID }}
+          ENABLE_BANDSINTOWN: ${{ vars.ENABLE_BANDSINTOWN }}
 ```
 
 4. Click **Commit changes**
@@ -224,6 +241,10 @@ Go to: **Settings** → **Secrets and variables** → **Actions** → **New repo
 - `SENDER_EMAIL` - `pjtatano@gmail.com` (or your verified email)
 - `RECIPIENT_EMAIL` - `pjtatano@gmail.com` (or where to receive alerts)
 
+**Optional (for Bandsintown):**
+- `BANDSINTOWN_APP_ID` - any string (defaults to `concert-alert-bot` if unset)
+- Variables → `ENABLE_BANDSINTOWN` - `true` to enable (defaults to `true` if unset)
+
 ### Step 4: Test Your Workflow
 
 1. Go to **Actions** tab
@@ -237,7 +258,7 @@ Go to: **Settings** → **Secrets and variables** → **Actions** → **New repo
 - **Curated list:** Your `my_artists.txt` is committed to GitHub (it's not sensitive data)
 - **Spotify follows:** The refresh token lets GitHub Actions check your Spotify follows automatically - no manual updates needed!
 - **New artists:** When you follow someone new on Spotify, the next run will automatically pick them up
-- **Schedule:** Runs every Wednesday at 12 PM PST (8 PM UTC)
+- **Schedule:** Runs daily at 1 PM PST (8 PM UTC)
   - Note: During Daylight Saving Time (PDT), it will run at 1 PM PDT
 
 This gives you the best of both worlds - a curated list backed up in git PLUS automatic syncing with Spotify follows! 🎉
