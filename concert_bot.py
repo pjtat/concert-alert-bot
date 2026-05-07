@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Concert Alert Bot — orchestrator across multiple data sources."""
+"""Concert Alert Bot."""
 import json
 import os
 import warnings
@@ -12,8 +12,8 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 
 import config
-from sources import ticketmaster, bandsintown
-from sources.normalize import NormalizedEvent, dedup_key
+from sources import ticketmaster
+from sources.normalize import NormalizedEvent
 
 warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL')
 
@@ -68,18 +68,7 @@ class ConcertBot:
             print(f"Cleaned up {len(to_remove)} past concerts from tracking")
 
     def is_already_notified(self, event: NormalizedEvent) -> bool:
-        if event.storage_id in self.notified_concerts:
-            return True
-        # Cross-source dedup by (artist, date)
-        target = dedup_key(event)
-        for meta in self.notified_concerts.values():
-            if not isinstance(meta, dict):
-                continue
-            artist = meta.get("artist")
-            date = meta.get("date")
-            if artist and date and (artist.strip().lower(), date) == target:
-                return True
-        return False
+        return event.storage_id in self.notified_concerts
 
     def record_notified(self, event: NormalizedEvent):
         self.notified_concerts[event.storage_id] = {
@@ -158,9 +147,7 @@ class ConcertBot:
     # ---------------- Source orchestration ----------------
 
     def collect_events(self, artist_name: str) -> List[NormalizedEvent]:
-        """Query all enabled sources for an artist and return normalized events."""
         events: List[NormalizedEvent] = []
-
         for raw in ticketmaster.search(
             api_key=config.TICKETMASTER_API_KEY,
             artist_name=artist_name,
@@ -174,18 +161,6 @@ class ConcertBot:
             if not ticketmaster.is_artist_match(raw, artist_name):
                 continue
             events.append(ticketmaster.normalize_event(raw, search_artist=artist_name))
-
-        if config.ENABLE_BANDSINTOWN:
-            for raw in bandsintown.search(
-                app_id=config.BANDSINTOWN_APP_ID,
-                artist_name=artist_name,
-                latitude=config.LATITUDE,
-                longitude=config.LONGITUDE,
-                radius_miles=config.SEARCH_RADIUS,
-                search_window_months=config.SEARCH_WINDOW_MONTHS,
-            ):
-                events.append(bandsintown.normalize_event(raw, search_artist=artist_name))
-
         return events
 
     # ---------------- Formatting ----------------
@@ -203,7 +178,7 @@ class ConcertBot:
         time_str = event.local_time or "TBA"
         lines = [
             "=" * 80,
-            f"NEW CONCERT ALERT! [{event.source}]",
+            "NEW CONCERT ALERT!",
             "=" * 80,
             f"Artist: {event.artist}",
             f"Event: {event.event_name}",
@@ -271,7 +246,6 @@ class ConcertBot:
 
         for ev in events:
             body += f'<div class="concert">'
-            body += f'<div class="source">via {ev.source}</div>'
             body += f'<div class="artist">{ev.artist}</div>'
             body += f'<div class="event">{ev.event_name}</div>'
             body += f'<div class="details">Date: {ev.local_date} at {ev.local_time or "TBA"}</div>'
@@ -293,7 +267,6 @@ class ConcertBot:
     def run(self):
         print("Starting Concert Alert Bot...")
         print(f"Searching within {config.SEARCH_RADIUS} miles of ({config.LATITUDE}, {config.LONGITUDE})")
-        print(f"Sources: ticketmaster" + (", bandsintown" if config.ENABLE_BANDSINTOWN else ""))
         print()
 
         self._cleanup_past_concerts()
@@ -307,12 +280,11 @@ class ConcertBot:
             print(f"[{i}/{len(artists)}] Checking {artist['name']}...")
             for event in self.collect_events(artist['name']):
                 if self.is_already_notified(event):
-                    self.record_notified(event)  # record cross-source ID without renotifying
                     continue
                 new_alerts.append(self.format_concert_alert(event))
                 new_events.append(event)
                 self.record_notified(event)
-                print(f"  -> [{event.source}] {event.event_name} on {event.local_date}")
+                print(f"  -> {event.event_name} on {event.local_date}")
 
         if new_alerts:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

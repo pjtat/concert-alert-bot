@@ -14,10 +14,6 @@ SPOTIFY_REFRESH_TOKEN = os.getenv('SPOTIFY_REFRESH_TOKEN')  # For GitHub Actions
 TICKETMASTER_API_KEY = os.getenv('TICKETMASTER_API_KEY')
 TICKETMASTER_BASE_URL = 'https://app.ticketmaster.com/discovery/v2'
 
-# Bandsintown Configuration
-BANDSINTOWN_APP_ID = os.getenv('BANDSINTOWN_APP_ID', 'concert-alert-bot')
-ENABLE_BANDSINTOWN = os.getenv('ENABLE_BANDSINTOWN', 'true').lower() == 'true'
-
 # Location Configuration (Los Angeles)
 LATITUDE = float(os.getenv('LATITUDE', '34.0522'))
 LONGITUDE = float(os.getenv('LONGITUDE', '-118.2437'))

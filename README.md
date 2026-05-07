@@ -5,22 +5,12 @@ A lightweight Python bot that monitors upcoming concerts for your favorite Spoti
 ## Features
 
 - Merges your curated artist list with Spotify followed artists automatically
-- Searches **two sources** in parallel: Ticketmaster Discovery API and Bandsintown
+- Searches Ticketmaster Discovery API for concerts within a configurable radius
 - Surfaces on-sale and presale times in alerts (Spotify Presale, Verified Fan, Citi, etc.)
-- Cross-source deduplication so the same show isn't reported twice
 - Filters out tribute bands and false positive matches
 - Email notifications via SendGrid (optional), only sent when there's something new
 - Tracks previously notified concerts to avoid duplicates
 - Lightweight and easy to run locally or via GitHub Actions
-
-## Data Sources
-
-The bot queries two services in parallel:
-
-- **Ticketmaster Discovery API** — accurate ticket URLs, on-sale times, and structured presale info (Spotify, Verified Fan, Citi, etc.). Caveat: events often appear here close to or at public on-sale, after presale codes have been distributed.
-- **Bandsintown** — artists/managers post tour dates here directly. Often surfaces tour announcements days to weeks before Ticketmaster's Discovery API has them. No structured presale data, but earlier visibility.
-
-Events are deduplicated across sources by `(artist, date)`. The first source to report a show wins the alert; the second source's listing is silently absorbed.
 
 ## Setup Instructions
 
@@ -75,12 +65,7 @@ TICKETMASTER_API_KEY=your_ticketmaster_api_key_here
 LATITUDE=34.0522
 LONGITUDE=-118.2437
 SEARCH_RADIUS=40
-BANDSINTOWN_APP_ID=concert-alert-bot
-ENABLE_BANDSINTOWN=true
 ```
-
-- `BANDSINTOWN_APP_ID` (optional, defaults to `concert-alert-bot`) — any string identifying your app to Bandsintown's free public API. No registration required.
-- `ENABLE_BANDSINTOWN` (optional, defaults to `true`) — set to `false` to disable Bandsintown queries.
 
 ### 4. Create Your Artist List (Optional)
 
@@ -215,9 +200,6 @@ jobs:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-          # Bandsintown
-          BANDSINTOWN_APP_ID: ${{ secrets.BANDSINTOWN_APP_ID }}
-          ENABLE_BANDSINTOWN: ${{ vars.ENABLE_BANDSINTOWN }}
 ```
 
 4. Click **Commit changes**
@@ -240,10 +222,6 @@ Go to: **Settings** → **Secrets and variables** → **Actions** → **New repo
 - `SENDGRID_API_KEY` - Your SendGrid API key
 - `SENDER_EMAIL` - `pjtatano@gmail.com` (or your verified email)
 - `RECIPIENT_EMAIL` - `pjtatano@gmail.com` (or where to receive alerts)
-
-**Optional (for Bandsintown):**
-- `BANDSINTOWN_APP_ID` - any string (defaults to `concert-alert-bot` if unset)
-- Variables → `ENABLE_BANDSINTOWN` - `true` to enable (defaults to `true` if unset)
 
 ### Step 4: Test Your Workflow
 
