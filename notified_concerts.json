@@ -223,10 +223,6 @@
     "date": "2026-07-17",
     "artist": "Cold War Kids"
   },
-  "tm:rZ7HnEZ1AfAoj7": {
-    "date": "2026-05-07",
-    "artist": "GZA"
-  },
   "tm:rZ7HnEZ1AfAojf": {
     "date": "2026-05-31",
     "artist": "GZA"
@@ -518,5 +514,21 @@
   "tm:vvG10Z_13MzLIQ": {
     "date": "2027-01-29",
     "artist": "Olivia Rodrigo"
+  },
+  "tm:Z7r9jZ1A70kAU": {
+    "date": "2026-10-18",
+    "artist": "Kacey Musgraves"
+  },
+  "tm:Z7r9jZ1A70kAg": {
+    "date": "2026-10-19",
+    "artist": "Kacey Musgraves"
+  },
+  "tm:vvG1iZ_axD89eU": {
+    "date": "2026-10-05",
+    "artist": "Magdalena Bay"
+  },
+  "tm:vvG1iZ_16lDyfW": {
+    "date": "2026-10-06",
+    "artist": "Magdalena Bay"
   }
 }
