@@ -23,10 +23,6 @@
     "date": "2026-10-22",
     "artist": "Doja Cat"
   },
-  "tm:Z7r9jZ1A7rK_P": {
-    "date": "2026-05-17",
-    "artist": "Father John Misty"
-  },
   "tm:vv1AaZkupGkdPfE94": {
     "date": "2026-05-19",
     "artist": "Florence + The Machine"
@@ -498,5 +494,9 @@
   "tm:Z7r9jZ1A70fOS": {
     "date": "2026-10-02",
     "artist": "JPEGMAFIA"
+  },
+  "tm:vvG10Z_1T5e4O_": {
+    "date": "2026-11-12",
+    "artist": "The Smashing Pumpkins"
   }
 }
