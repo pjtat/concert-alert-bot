@@ -23,10 +23,6 @@
     "date": "2026-10-22",
     "artist": "Doja Cat"
   },
-  "tm:vv1AaZkupGkdPpM9N": {
-    "date": "2026-05-20",
-    "artist": "Florence + The Machine"
-  },
   "tm:vv1AaZkCvGkeNTMsx": {
     "date": null,
     "artist": null
@@ -109,10 +105,6 @@
   },
   "tm:vv110ZbM7F-6p9": {
     "date": null,
-    "artist": null
-  },
-  "tm:09006356E55B75E3": {
-    "date": "2026-05-20",
     "artist": null
   },
   "tm:09006384BC94B14F": {
@@ -490,5 +482,9 @@
   "tm:vvG10Z_1T5e4O_": {
     "date": "2026-11-12",
     "artist": "The Smashing Pumpkins"
+  },
+  "tm:Z7r9jZ1A70Yuv": {
+    "date": "2026-09-19",
+    "artist": "Sofi Tukker"
   }
 }
