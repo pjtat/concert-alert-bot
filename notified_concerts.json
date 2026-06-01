@@ -67,10 +67,6 @@
     "date": "2026-08-21",
     "artist": "Mt. Joy"
   },
-  "tm:vv1AaZkC7GkeHP5A2": {
-    "date": "2026-05-31",
-    "artist": "New Found Glory"
-  },
   "tm:vv170ZbgGkSPtF2G": {
     "date": "2026-08-08",
     "artist": "O.A.R."
@@ -105,10 +101,6 @@
   },
   "tm:vv110ZbM7F-6p9": {
     "date": null,
-    "artist": null
-  },
-  "tm:09006384BC94B14F": {
-    "date": "2026-05-31",
     "artist": null
   },
   "tm:13999404": {
@@ -170,10 +162,6 @@
   "tm:vv170Z_7GkTb7DoV": {
     "date": "2026-07-17",
     "artist": "Cold War Kids"
-  },
-  "tm:rZ7HnEZ1AfAojf": {
-    "date": "2026-05-31",
-    "artist": "GZA"
   },
   "tm:G5eYZ_d9bkZHO": {
     "date": "2026-09-01",
@@ -486,5 +474,9 @@
   "tm:vvG10Z_5hc5z29": {
     "date": "2026-11-21",
     "artist": "Ben Quad"
+  },
+  "tm:Z7r9jZ1A7Pe_N": {
+    "date": "2026-07-23",
+    "artist": "Suki Waterhouse"
   }
 }
