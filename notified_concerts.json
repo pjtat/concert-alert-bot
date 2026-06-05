@@ -427,10 +427,6 @@
     "date": "2027-01-25",
     "artist": "Olivia Rodrigo"
   },
-  "tm:vvG10Z_1boB7Co": {
-    "date": "2026-06-04",
-    "artist": "Future"
-  },
   "tm:vvG10Z_13MwTE-": {
     "date": "2027-01-28",
     "artist": "Olivia Rodrigo"
@@ -486,5 +482,13 @@
   "tm:Z7r9jZ1A70yjs": {
     "date": "2026-10-29",
     "artist": "Denzel Curry"
+  },
+  "tm:vvG10Z_5EPLBfx": {
+    "date": "2026-10-30",
+    "artist": "Alex G"
+  },
+  "tm:vvG10Z_GoUbfs2": {
+    "date": "2026-10-31",
+    "artist": "Alex G"
   }
 }
