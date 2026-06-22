@@ -139,10 +139,6 @@
     "date": "2026-06-27",
     "artist": "A$AP Rocky"
   },
-  "tm:vv170Z_dGkVbRx3o": {
-    "date": "2026-06-21",
-    "artist": "Freddie Gibbs"
-  },
   "tm:vvG1iZ_7AHcorB": {
     "date": "2026-08-15",
     "artist": "Noah Kahan"
@@ -530,5 +526,17 @@
   "tm:rZ7HnEZ1AfF6O7": {
     "date": "2026-08-02",
     "artist": "Future"
+  },
+  "tm:vvG10Z_10F2DJ2": {
+    "date": "2026-09-17",
+    "artist": "Chance the Rapper"
+  },
+  "tm:vvG10Z_u5JYCDh": {
+    "date": "2026-09-20",
+    "artist": "Chance the Rapper"
+  },
+  "tm:vvG10Z_uQ-OUd8": {
+    "date": "2026-08-29",
+    "artist": "Chappell Roan"
   }
 }
