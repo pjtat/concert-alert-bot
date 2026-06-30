@@ -83,10 +83,6 @@
     "date": "2026-07-21",
     "artist": "Rainbow Kitten Surprise"
   },
-  "tm:vv170ZbUGkD8GP9V": {
-    "date": "2026-06-29",
-    "artist": "ROSAL\u00cdA"
-  },
   "tm:vv1k0ZbzfZG7TUlC": {
     "date": "2026-07-01",
     "artist": "ROSAL\u00cdA"
@@ -125,10 +121,6 @@
   },
   "tm:09006356A34F4BFA": {
     "date": "2026-07-21",
-    "artist": null
-  },
-  "tm:0900636ED03255F4": {
-    "date": "2026-06-29",
     "artist": null
   },
   "tm:0900638500FF6ACE": {
@@ -546,5 +538,13 @@
   "tm:vvG10Z_u5IYTve": {
     "date": "2026-10-18",
     "artist": "Turnstile"
+  },
+  "tm:vvG10Z_uU7Ndiz": {
+    "date": "2026-10-15",
+    "artist": "Dinosaur Jr."
+  },
+  "tm:vvG10Z_uEYxKa-": {
+    "date": "2026-10-16",
+    "artist": "Dinosaur Jr."
   }
 }
