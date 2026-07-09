@@ -323,10 +323,6 @@
     "date": "2026-08-19",
     "artist": null
   },
-  "tm:Z7r9jZ1A7xK0J": {
-    "date": "2026-07-08",
-    "artist": "Royel Otis"
-  },
   "tm:vvG1iZ_aONtOtr": {
     "date": "2026-08-28",
     "artist": null
@@ -542,5 +538,13 @@
   "tm:vv1AaZkoJGkeB6Lh9": {
     "date": "2026-12-19",
     "artist": "Earl Sweatshirt"
+  },
+  "tm:Z7r9jZ1A7P3AN": {
+    "date": "2026-12-03",
+    "artist": "Jalen Ngonda"
+  },
+  "tm:Z7r9jZ1A70grd": {
+    "date": "2026-08-27",
+    "artist": "Sweet Pill"
   }
 }
