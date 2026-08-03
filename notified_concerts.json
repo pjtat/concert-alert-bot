@@ -183,10 +183,6 @@
     "date": "2026-08-18",
     "artist": "Passion Pit"
   },
-  "tm:Z7r9jZ1A7-ObY": {
-    "date": "2026-08-02",
-    "artist": "St. Vincent"
-  },
   "tm:Z7r9jZ1A7-VuN": {
     "date": "2026-09-10",
     "artist": "Bleachers"
@@ -451,10 +447,6 @@
     "date": "2026-11-07",
     "artist": "Brand New"
   },
-  "tm:rZ7HnEZ1AfF6O7": {
-    "date": "2026-08-02",
-    "artist": "Future"
-  },
   "tm:vvG10Z_10F2DJ2": {
     "date": "2026-09-17",
     "artist": "Chance the Rapper"
@@ -514,5 +506,9 @@
   "tm:vvG10Z_2N0ou5E": {
     "date": "2027-01-23",
     "artist": "Hot Mulligan"
+  },
+  "tm:vvG10Z_2SHYOng": {
+    "date": "2026-10-07",
+    "artist": "ScHoolboy Q"
   }
 }
